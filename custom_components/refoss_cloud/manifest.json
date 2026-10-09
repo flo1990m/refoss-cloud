@@ -1,13 +1,15 @@
 {
   "domain": "refoss_cloud",
   "name": "Refoss Cloud",
-  "version": "1.0.4",
-  "documentation": "https://github.com/flo1990m/refoss-cloud",
-  "issue_tracker": "https://github.com/flo1990m/refoss-cloud/issues",
-  "codeowners": ["@flo1990m"],
+  "codeowners": [
+    "@flo1990m"
+  ],
   "config_flow": true,
-  "iot_class": "cloud_push",
+  "documentation": "https://github.com/flo1990m/refoss-cloud",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/flo1990m/refoss-cloud/issues",
   "requirements": [
     "paho-mqtt>=2.1.0"
-  ]
+  ],
+  "version": "1.0.4"
 }

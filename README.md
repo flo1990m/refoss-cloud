@@ -15,6 +15,7 @@ Unofficial Home Assistant custom integration for Refoss smart plugs using the Re
 - Daily energy consumption where supported
 - Fast power refresh while an electricity-capable plug is ON
 - Periodic discovery of newly added Refoss devices
+- Home Assistant diagnostics with sensitive identifiers redacted
 
 ## Tested devices
 
@@ -75,6 +76,12 @@ grid_options:
 Credentials are stored in the Home Assistant config entry in the same way as many other cloud integrations. They are sent only to the Refoss cloud endpoints used by the integration.
 
 The integration contains an application-level signing constant extracted from the official app. This is not a per-user secret.
+
+## Updating
+
+When updating through HACS, restart Home Assistant completely after installation. Existing config entries and entity IDs are kept because the integration domain and unique IDs remain unchanged.
+
+See `CHANGELOG.md` for release notes.
 
 ## Support / bug reports
 

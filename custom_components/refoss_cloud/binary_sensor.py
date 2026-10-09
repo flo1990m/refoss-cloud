@@ -7,6 +7,7 @@ from homeassistant.components.binary_sensor import (
 from homeassistant.helpers.dispatcher import (
     async_dispatcher_connect,
 )
+from homeassistant.helpers.entity import EntityCategory
 
 from .const import DOMAIN
 from .entity import RefossEntity
@@ -81,6 +82,7 @@ class RefossOnlineSensor(
     _attr_device_class = (
         BinarySensorDeviceClass.CONNECTIVITY
     )
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(
         self,

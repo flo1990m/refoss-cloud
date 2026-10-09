@@ -1,7 +1,7 @@
 {
   "domain": "refoss_cloud",
   "name": "Refoss Cloud",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "documentation": "https://github.com/flo1990m/refoss-cloud",
   "issue_tracker": "https://github.com/flo1990m/refoss-cloud/issues",
   "codeowners": ["@flo1990m"],

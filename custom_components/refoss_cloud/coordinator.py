@@ -48,8 +48,9 @@ class RefossCoordinator(DataUpdateCoordinator):
         self._last_discovery = time.monotonic()
         await self.async_refresh()
 
-        self._electricity_task = self.hass.async_create_task(
-            self._electricity_loop()
+        self._electricity_task = self.hass.async_create_background_task(
+            self._electricity_loop(),
+            "Refoss electricity polling",
         )
 
     async def _async_update_data(self):

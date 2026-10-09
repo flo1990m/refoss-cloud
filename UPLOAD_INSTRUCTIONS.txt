@@ -1,0 +1,26 @@
+Refoss Cloud v1.0.4 - fichiers à mettre à jour sur GitHub
+
+1) Remplacer :
+   custom_components/refoss_cloud/coordinator.py
+   par le coordinator.py fourni dans ce ZIP.
+
+2) Ouvrir :
+   custom_components/refoss_cloud/manifest.json
+   et modifier uniquement :
+   "version": "1.0.3"
+   en :
+   "version": "1.0.4"
+
+3) Ouvrir CHANGELOG.md à la racine du dépôt et ajouter en haut la section contenue dans CHANGELOG_v1.0.4_ENTRY.md.
+
+4) Valider les changements sur la branche principale.
+
+5) Créer une nouvelle Release GitHub :
+   Tag : v1.0.4
+   Titre : v1.0.4
+   Notes :
+   Fix Home Assistant startup delay caused by the electricity polling loop being tracked as a startup task.
+
+6) Une fois la release publiée, HACS finira par proposer la mise à jour 1.0.4.
+
+Important : ne remplace pas tout le manifest.json avec un fichier généré ici ; modifie seulement le numéro de version pour conserver toutes les métadonnées existantes du dépôt.

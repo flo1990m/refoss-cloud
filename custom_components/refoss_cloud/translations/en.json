@@ -1,0 +1,23 @@
+{
+  "title": "Refoss Cloud",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Refoss",
+        "description": "Sign in to your Refoss Cloud account.",
+        "data": {
+          "email": "Email address",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Unable to connect to Refoss.",
+      "invalid_auth": "Invalid Refoss credentials.",
+      "unknown": "Unknown error."
+    },
+    "abort": {
+      "already_configured": "This Refoss account is already configured."
+    }
+  }
+}

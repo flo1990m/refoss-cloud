@@ -9,6 +9,13 @@
           "email": "Adresse e-mail",
           "password": "Mot de passe"
         }
+      },
+      "reauth_confirm": {
+        "title": "[%key:common::config_flow::title::reauth%]",
+        "description": "Le mot de passe du compte Refoss ({email}) n’est plus accepté. Saisis-le à nouveau pour reconnecter l’intégration.",
+        "data": {
+          "password": "Mot de passe"
+        }
       }
     },
     "error": {
@@ -17,7 +24,13 @@
       "unknown": "Erreur inconnue."
     },
     "abort": {
-      "already_configured": "Ce compte Refoss est déjà configuré."
+      "already_configured": "Ce compte Refoss est déjà configuré.",
+      "unique_id_mismatch": "Le compte Refoss doit être le même que celui déjà configuré."
+    }
+  },
+  "exceptions": {
+    "invalid_auth": {
+      "message": "Les identifiants Refoss ne sont plus valides. Reconnecte ton compte."
     }
   }
 }

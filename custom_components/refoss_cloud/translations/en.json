@@ -31,6 +31,9 @@
   "exceptions": {
     "invalid_auth": {
       "message": "Your Refoss credentials are no longer valid. Re-authenticate your account."
+    },
+    "cannot_connect": {
+      "message": "Unable to reach Refoss. Home Assistant will retry automatically."
     }
   }
 }

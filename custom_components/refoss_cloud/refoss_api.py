@@ -202,12 +202,17 @@ class RefossApi:
 
             await self._async_refresh_token(token)
 
-            return await self._post_once(
-                self.api_url,
-                path,
-                params,
-                token=self.token,
-            )
+            try:
+                return await self._post_once(
+                    self.api_url,
+                    path,
+                    params,
+                    token=self.token,
+                )
+            except RefossAuthError:
+                # Do not repeatedly sign in if a newly issued token is also rejected.
+                self._auth_failed = True
+                raise
 
     async def _post_once(
         self,

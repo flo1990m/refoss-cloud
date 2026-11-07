@@ -254,8 +254,8 @@ class RefossCoordinator(DataUpdateCoordinator):
                     state["electricity_probe_done"] = True
 
             except RefossAuthError:
-            raise
-        except Exception as exc:
+                raise
+            except Exception as exc:
                 _LOGGER.debug(
                     "Electricity probe error for %s: %s",
                     device.get("devName", device_uuid),

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.6 (unreleased)
+
+- Automatically renew the Refoss API session when the cloud rejects an expired or invalid token, then retry the failed request once.
+- Add Home Assistant reauthentication when the saved password is no longer accepted.
+- Preserve the existing config entry and entity unique IDs during reauthentication.
+- Surface authentication failures from polling and switch commands instead of silently swallowing them.
+
+# Changelog
+
 ## 1.0.4
 
 - Fix Home Assistant startup delay caused by the Refoss electricity polling loop being tracked as a startup task.

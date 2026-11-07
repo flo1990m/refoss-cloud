@@ -7,8 +7,6 @@
 - Preserve the existing config entry and entity unique IDs during reauthentication.
 - Surface authentication failures from polling and switch commands instead of silently swallowing them.
 
-# Changelog
-
 ## 1.0.4
 
 - Fix Home Assistant startup delay caused by the Refoss electricity polling loop being tracked as a startup task.

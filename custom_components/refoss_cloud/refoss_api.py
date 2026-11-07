@@ -352,6 +352,8 @@ class RefossApi:
             "mqttDomain"
         )
 
+        self._auth_failed = False
+
         return data
 
     async def async_get_devices(

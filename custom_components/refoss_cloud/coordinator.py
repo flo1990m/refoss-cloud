@@ -6,6 +6,10 @@ import logging
 import time
 
 from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.exceptions import (
+    ConfigEntryAuthFailed,
+    ConfigEntryNotReady,
+)
 from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
     UpdateFailed,
@@ -15,6 +19,10 @@ from .const import (
     DEVICE_DISCOVERY_INTERVAL,
     DOMAIN,
     SLOW_UPDATE_INTERVAL,
+)
+from .refoss_api import (
+    RefossAuthError,
+    RefossConnectionError,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -29,6 +37,7 @@ class RefossCoordinator(DataUpdateCoordinator):
             _LOGGER,
             name="Refoss Cloud",
             update_interval=timedelta(seconds=SLOW_UPDATE_INTERVAL),
+            config_entry=entry,
         )
 
         self.api = api
@@ -42,11 +51,23 @@ class RefossCoordinator(DataUpdateCoordinator):
         self.api.set_push_callback(self._handle_push)
 
     async def async_initialize(self):
-        await self.api.async_login()
-        self.devices = await self.api.async_get_devices()
-        await self.api.async_connect_mqtt()
+        try:
+            await self.api.async_login()
+            self.devices = await self.api.async_get_devices()
+            await self.api.async_connect_mqtt()
+        except RefossAuthError as exc:
+            raise ConfigEntryAuthFailed(
+                translation_domain=DOMAIN,
+                translation_key="invalid_auth",
+            ) from exc
+        except RefossConnectionError as exc:
+            raise ConfigEntryNotReady(
+                translation_domain=DOMAIN,
+                translation_key="cannot_connect",
+            ) from exc
+
         self._last_discovery = time.monotonic()
-        await self.async_refresh()
+        await self.async_config_entry_first_refresh()
 
         self._electricity_task = self.hass.async_create_background_task(
             self._electricity_loop(),
@@ -61,7 +82,7 @@ class RefossCoordinator(DataUpdateCoordinator):
                 await self._async_discover_devices()
                 self._last_discovery = now
 
-            await asyncio.gather(
+            results = await asyncio.gather(
                 *[
                     self._async_update_slow(device_uuid, device)
                     for device_uuid, device in list(self.devices.items())
@@ -69,7 +90,22 @@ class RefossCoordinator(DataUpdateCoordinator):
                 return_exceptions=True,
             )
 
+            # Per-device errors are normally isolated, but authentication errors
+            # must escape so Home Assistant can start the reauth flow.
+            for result in results:
+                if isinstance(result, RefossAuthError):
+                    raise result
+
             return self.states
+
+        except ConfigEntryAuthFailed:
+            raise
+
+        except RefossAuthError as exc:
+            raise ConfigEntryAuthFailed(
+                translation_domain=DOMAIN,
+                translation_key="invalid_auth",
+            ) from exc
 
         except Exception as exc:
             raise UpdateFailed(str(exc)) from exc
@@ -96,7 +132,18 @@ class RefossCoordinator(DataUpdateCoordinator):
                         state["current"] = 0
 
                 if tasks:
-                    await asyncio.gather(*tasks, return_exceptions=True)
+                    results = await asyncio.gather(
+                        *tasks,
+                        return_exceptions=True,
+                    )
+
+                    if any(
+                        isinstance(result, RefossAuthError)
+                        for result in results
+                    ):
+                        self.entry.async_start_reauth(self.hass)
+                        return
+
                     self.async_set_updated_data(self.states)
 
             except asyncio.CancelledError:
@@ -171,6 +218,8 @@ class RefossCoordinator(DataUpdateCoordinator):
                         state["power"] = 0
                         state["current"] = 0
 
+        except RefossAuthError:
+            raise
         except Exception as exc:
             _LOGGER.debug(
                 "System.All error for %s: %s",
@@ -204,7 +253,9 @@ class RefossCoordinator(DataUpdateCoordinator):
                     state["supports_electricity"] = False
                     state["electricity_probe_done"] = True
 
-            except Exception as exc:
+            except RefossAuthError:
+            raise
+        except Exception as exc:
                 _LOGGER.debug(
                     "Electricity probe error for %s: %s",
                     device.get("devName", device_uuid),
@@ -236,6 +287,8 @@ class RefossCoordinator(DataUpdateCoordinator):
                     if not found_today:
                         state["energy_today"] = 0
 
+        except RefossAuthError:
+            raise
         except Exception as exc:
             _LOGGER.debug(
                 "ConsumptionX error for %s: %s",
@@ -330,7 +383,11 @@ class RefossCoordinator(DataUpdateCoordinator):
         self.async_set_updated_data(self.states)
 
     async def async_set_switch(self, device_uuid, value):
-        response = await self.api.async_set_switch(device_uuid, value)
+        try:
+            response = await self.api.async_set_switch(device_uuid, value)
+        except RefossAuthError:
+            self.entry.async_start_reauth(self.hass)
+            raise
 
         if response is not None:
             state = self._ensure_state(device_uuid)

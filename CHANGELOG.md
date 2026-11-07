@@ -7,6 +7,11 @@
 - Preserve the existing config entry and entity unique IDs during reauthentication.
 - Surface authentication failures from polling and switch commands instead of silently swallowing them.
 
+## 1.0.5
+
+- Added the English fallback translation required by Home Assistant.
+- Added HACS and Hassfest GitHub Actions validation.
+
 ## 1.0.4
 
 - Fix Home Assistant startup delay caused by the Refoss electricity polling loop being tracked as a startup task.

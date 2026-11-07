@@ -69,6 +69,10 @@ class RefossApi:
         self._pending = {}
         self._push_callback = None
 
+        # Serialize refreshes so parallel polls only sign in once.
+        self._auth_lock = asyncio.Lock()
+        self._auth_failed = False
+
     @staticmethod
     def _md5(value):
         return hashlib.md5(
@@ -122,7 +126,90 @@ class RefossApi:
             "nonce": nonce,
         }
 
+    @staticmethod
+    def _is_auth_error(data):
+        """Return True when Refoss reports an expired or rejected session."""
+        fields = (
+            "info",
+            "message",
+            "msg",
+            "error",
+            "errorMessage",
+            "error_code",
+        )
+        message = " ".join(
+            str(data.get(field, ""))
+            for field in fields
+            if data.get(field) is not None
+        ).casefold()
+
+        return any(
+            marker in message
+            for marker in (
+                "token",
+                "unauthorized",
+                "unauthorised",
+                "not authorized",
+                "not authorised",
+                "authentication failed",
+                "authorization failed",
+                "auth failed",
+                "session expired",
+                "invalid session",
+                "login required",
+                "please login",
+                "please sign in",
+                "not logged in",
+            )
+        )
+
+    async def _async_refresh_token(self, failed_token):
+        """Refresh the Refoss session once when the cloud rejects its token."""
+        async with self._auth_lock:
+            if self._auth_failed:
+                raise RefossAuthError(
+                    "Le compte Refoss doit être reconnecté"
+                )
+
+            # Another concurrent request may already have refreshed the token.
+            if self.token != failed_token:
+                return
+
+            try:
+                await self.async_login()
+            except RefossAuthError:
+                self._auth_failed = True
+                raise
+
     async def _post(
+        self,
+        base_url,
+        path,
+        params,
+        token=None,
+    ):
+        """Post to Refoss and renew an expired session once if needed."""
+        try:
+            return await self._post_once(
+                base_url,
+                path,
+                params,
+                token=token,
+            )
+        except RefossAuthError:
+            if not token:
+                raise
+
+            await self._async_refresh_token(token)
+
+            return await self._post_once(
+                self.api_url,
+                path,
+                params,
+                token=self.token,
+            )
+
+    async def _post_once(
         self,
         base_url,
         path,
@@ -168,12 +255,17 @@ class RefossApi:
                         await response.text()
                     )
 
+                    if response.status in (401, 403) and (
+                        token or path.endswith("/signIn")
+                    ):
+                        raise RefossAuthError(
+                            "Jeton ou identifiants Refoss refusés "
+                            f"(HTTP {response.status})"
+                        )
+
                     if response.status != 200:
-                        raise (
-                            RefossConnectionError(
-                                f"HTTP "
-                                f"{response.status}"
-                            )
+                        raise RefossConnectionError(
+                            f"HTTP {response.status}"
                         )
 
         except asyncio.TimeoutError as exc:
@@ -207,16 +299,16 @@ class RefossApi:
                 "Erreur Refoss",
             )
 
-            if path.endswith(
-                "/signIn"
-            ):
-                raise RefossAuthError(
-                    str(info)
+            if path.endswith("/signIn") or (
+                token
+                and (
+                    api_status in (401, 403, "401", "403")
+                    or self._is_auth_error(data)
                 )
+            ):
+                raise RefossAuthError(str(info))
 
-            raise RefossError(
-                str(info)
-            )
+            raise RefossError(str(info))
 
         return data.get(
             "data",

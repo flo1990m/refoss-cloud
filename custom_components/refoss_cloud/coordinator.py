@@ -343,7 +343,12 @@ class RefossCoordinator(DataUpdateCoordinator):
             )
 
     async def _async_update_electricity_now(self, device_uuid):
-        await self._async_update_electricity(device_uuid)
+        try:
+            await self._async_update_electricity(device_uuid)
+        except RefossAuthError:
+            self.entry.async_start_reauth(self.hass)
+            return
+
         self.async_set_updated_data(self.states)
 
     def _handle_push(self, message):

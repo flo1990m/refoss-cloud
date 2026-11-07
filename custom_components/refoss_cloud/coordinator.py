@@ -333,6 +333,8 @@ class RefossCoordinator(DataUpdateCoordinator):
             state["electricity_initialized"] = True
             self._apply_electricity(state, data)
 
+        except RefossAuthError:
+            raise
         except Exception as exc:
             _LOGGER.debug(
                 "Electricity error for %s: %s",

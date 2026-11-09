@@ -1,6 +1,13 @@
 # Changelog
 
-## 1.0.6 (unreleased)
+## 1.0.7
+
+- Add a manual "Reconfigure" action to update the Refoss account email and password from the Home Assistant integration menu.
+- Validate the new credentials against Refoss before saving them.
+- Ensure the same Refoss account is used so existing devices, entities and history remain attached to the config entry.
+- Keep automatic token renewal, automatic reauthentication, setup retry handling and non-blocking MQTT shutdown from 1.0.6.
+
+## 1.0.6
 
 - Automatically renew the Refoss API session when the cloud rejects an expired or invalid token, then retry the failed request once.
 - Add Home Assistant reauthentication when the saved password is no longer accepted.

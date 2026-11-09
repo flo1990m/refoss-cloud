@@ -16,6 +16,14 @@
         "data": {
           "password": "Password"
         }
+      },
+      "reconfigure": {
+        "title": "Update Refoss credentials",
+        "description": "Enter the email address and password for the Refoss account. Use the same account to keep the existing devices and entities.",
+        "data": {
+          "email": "Email address",
+          "password": "New password"
+        }
       }
     },
     "error": {

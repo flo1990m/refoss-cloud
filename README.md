@@ -7,6 +7,9 @@ Unofficial Home Assistant custom integration for Refoss smart plugs using the Re
 ## Features
 
 - Refoss account login through the Home Assistant UI
+- Automatic refresh of rejected Refoss session tokens
+- Home Assistant reauthentication when the saved password is no longer accepted
+- Manual credential reconfiguration from the Home Assistant integration menu, without removing the existing entry
 - Automatic discovery of devices on the account
 - Cloud ON/OFF control
 - MQTT push updates for switch state
@@ -76,6 +79,14 @@ grid_options:
 Credentials are stored in the Home Assistant config entry in the same way as many other cloud integrations. They are sent only to the Refoss cloud endpoints used by the integration.
 
 The integration contains an application-level signing constant extracted from the official app. This is not a per-user secret.
+
+## Updating account credentials manually
+
+Open the Refoss Cloud integration entry in Home Assistant, choose **Reconfigure**, then enter the account email and current password. The credentials are verified against Refoss before the existing config entry is updated. The same Refoss account must be used to preserve the devices and entity IDs.
+
+## Authentication recovery
+
+The integration automatically requests a fresh Refoss session when the cloud rejects an expired token, then retries the affected request once. If Refoss no longer accepts the saved password, Home Assistant opens a reauthentication flow. Enter the account password again; the existing integration entry, devices, and entity IDs are kept.
 
 ## Updating
 

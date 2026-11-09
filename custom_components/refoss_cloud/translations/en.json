@@ -9,6 +9,21 @@
           "email": "Email address",
           "password": "Password"
         }
+      },
+      "reauth_confirm": {
+        "title": "[%key:common::config_flow::title::reauth%]",
+        "description": "The password for your Refoss account ({email}) is no longer accepted. Enter it again to reconnect the integration.",
+        "data": {
+          "password": "Password"
+        }
+      },
+      "reconfigure": {
+        "title": "Update Refoss credentials",
+        "description": "Enter the email address and password for the Refoss account. Use the same account to keep the existing devices and entities.",
+        "data": {
+          "email": "Email address",
+          "password": "New password"
+        }
       }
     },
     "error": {
@@ -17,7 +32,16 @@
       "unknown": "Unknown error."
     },
     "abort": {
-      "already_configured": "This Refoss account is already configured."
+      "already_configured": "This Refoss account is already configured.",
+      "unique_id_mismatch": "You must sign in with the same Refoss account that is already configured."
+    }
+  },
+  "exceptions": {
+    "invalid_auth": {
+      "message": "Your Refoss credentials are no longer valid. Re-authenticate your account."
+    },
+    "cannot_connect": {
+      "message": "Unable to reach Refoss. Home Assistant will retry automatically."
     }
   }
 }

@@ -807,18 +807,29 @@ class RefossApi:
         if not self.client:
             return
 
-        try:
-            self.client.loop_stop()
+        client = self.client
 
-            await (
-                self.hass
-                .async_add_executor_job(
-                    self.client.disconnect
-                )
+        try:
+            # loop_stop() joins Paho's network thread, so never run it
+            # directly on Home Assistant's event loop.
+            await self.hass.async_add_executor_job(
+                client.loop_stop
+            )
+        except Exception:
+            _LOGGER.debug(
+                "Erreur lors de l'arrêt de la boucle MQTT Refoss",
+                exc_info=True,
             )
 
+        try:
+            await self.hass.async_add_executor_job(
+                client.disconnect
+            )
         except Exception:
-            pass
+            _LOGGER.debug(
+                "Erreur lors de la déconnexion MQTT Refoss",
+                exc_info=True,
+            )
 
         self.client = None
         self.connected = False

@@ -16,6 +16,14 @@
         "data": {
           "password": "Mot de passe"
         }
+      },
+      "reconfigure": {
+        "title": "Modifier les identifiants Refoss",
+        "description": "Saisis l'adresse e-mail et le mot de passe du compte Refoss à utiliser. Le compte doit rester le même pour conserver les appareils et les entités existants.",
+        "data": {
+          "email": "Adresse e-mail",
+          "password": "Nouveau mot de passe"
+        }
       }
     },
     "error": {

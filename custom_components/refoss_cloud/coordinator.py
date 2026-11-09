@@ -65,6 +65,13 @@ class RefossCoordinator(DataUpdateCoordinator):
                 translation_domain=DOMAIN,
                 translation_key="cannot_connect",
             ) from exc
+        except OSError as exc:
+            # MQTT socket errors (for example, DNS or network unavailable)
+            # must be retried by Home Assistant instead of aborting setup.
+            raise ConfigEntryNotReady(
+                translation_domain=DOMAIN,
+                translation_key="cannot_connect",
+            ) from exc
 
         self._last_discovery = time.monotonic()
         await self.async_config_entry_first_refresh()

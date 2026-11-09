@@ -18,10 +18,12 @@ jobs:
     steps:
       - name: Verify and move release tag
         uses: actions/github-script@v7
+        env:
+          CONFIRM: ${{ inputs.confirm }}
         with:
           script: |
             const expected = "MOVE-v1.0.7-TO-MAIN";
-            const supplied = "${{ inputs.confirm }}";
+            const supplied = process.env.CONFIRM;
 
             if (supplied !== expected) {
               core.setFailed("Confirmation does not match. No tag was changed.");

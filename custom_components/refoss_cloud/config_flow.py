@@ -88,6 +88,70 @@ class RefossCloudConfigFlow(
             errors=errors,
         )
 
+    async def async_step_reconfigure(
+        self,
+        user_input=None,
+    ):
+        """Allow the user to update Refoss account credentials manually."""
+        entry = self._get_reconfigure_entry()
+        errors = {}
+
+        if user_input is not None:
+            email = user_input[CONF_EMAIL].strip().lower()
+            password = user_input[CONF_PASSWORD]
+
+            api = RefossApi(
+                self.hass,
+                email,
+                password,
+            )
+
+            try:
+                login_data = await api.async_login()
+
+            except RefossAuthError:
+                errors["base"] = "invalid_auth"
+
+            except (RefossConnectionError, OSError):
+                errors["base"] = "cannot_connect"
+
+            except Exception:
+                _LOGGER.exception(
+                    "Erreur pendant la reconfiguration Refoss"
+                )
+                errors["base"] = "unknown"
+
+            else:
+                await self.async_set_unique_id(
+                    str(login_data["userid"])
+                )
+                self._abort_if_unique_id_mismatch()
+
+                return self.async_update_reload_and_abort(
+                    entry,
+                    title=email,
+                    data_updates={
+                        CONF_EMAIL: email,
+                        CONF_PASSWORD: password,
+                    },
+                )
+
+        schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_EMAIL,
+                    default=entry.data[CONF_EMAIL],
+                ): str,
+                vol.Required(CONF_PASSWORD): str,
+            }
+        )
+
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=schema,
+            errors=errors,
+        )
+
     async def async_step_reauth(
         self,
         entry_data,

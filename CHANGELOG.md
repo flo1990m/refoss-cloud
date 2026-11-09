@@ -6,6 +6,8 @@
 - Add Home Assistant reauthentication when the saved password is no longer accepted.
 - Preserve the existing config entry and entity unique IDs during reauthentication.
 - Surface authentication failures from polling and switch commands instead of silently swallowing them.
+- Convert setup-time socket errors into `ConfigEntryNotReady` so Home Assistant retries when the network or Refoss MQTT service is unavailable.
+- Stop the Paho MQTT network loop in Home Assistant's executor to avoid blocking the event loop during unload.
 
 ## 1.0.5
 

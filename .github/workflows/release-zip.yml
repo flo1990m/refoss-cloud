@@ -13,6 +13,23 @@ on:
 permissions:
   contents: write
 
+  # Temporary test trigger: run once on this workflow-only commit.
+  # Removed immediately after the test download has been counted.
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/release-zip.yml"
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to process (for example v1.0.9)"
+        required: false
+        type: string
+
 jobs:
   zip:
     name: Build and upload Refoss ZIP
@@ -53,3 +70,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.target.outputs.tag }}
         run: gh release upload "$TAG" refoss-cloud.zip --clobber
+
+      - name: Simulate one real ZIP download for counter verification
+        if: github.event_name == 'push'
+        env:
+          URL: https://github.com/flo1990m/refoss-cloud/releases/download/v1.0.9/refoss-cloud.zip
+        run: |
+          curl --fail --location --silent --show-error "$URL" --output "$RUNNER_TEMP/refoss-cloud-test.zip"
+          unzip -t "$RUNNER_TEMP/refoss-cloud-test.zip"

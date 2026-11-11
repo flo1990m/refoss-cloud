@@ -9,7 +9,7 @@ on:
         description: "Release tag to process (for example v1.0.9)"
         required: false
         type: string
-  # One-time bootstrap: publishing this workflow update builds the ZIP for
+  # One-time bootstrap: this follow-up workflow commit builds the ZIP for
   # the already-published v1.0.9 release. Future code pushes do not trigger it.
   push:
     branches:

@@ -1,11 +1,6 @@
 name: Attach release ZIP
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/release-zip.yml"
   release:
     types: [published]
   workflow_dispatch:
@@ -58,10 +53,3 @@ jobs:
           TAG: ${{ steps.target.outputs.tag }}
         run: gh release upload "$TAG" refoss-cloud.zip --clobber
 
-      - name: Simulate one real ZIP download for counter verification
-        if: github.event_name == 'push'
-        env:
-          URL: https://github.com/flo1990m/refoss-cloud/releases/download/v1.0.9/refoss-cloud.zip
-        run: |
-          curl --fail --location --silent --show-error "$URL" --output "$RUNNER_TEMP/refoss-cloud-test.zip"
-          unzip -t "$RUNNER_TEMP/refoss-cloud-test.zip"

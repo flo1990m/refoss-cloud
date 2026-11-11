@@ -33,6 +33,9 @@ async def async_setup_entry(hass, entry):
         PLATFORMS,
     )
 
+    # Start MQTT state polling only after HA has completed its startup phase.
+    coordinator.async_start_deferred_initialization()
+
     return True
 
 

@@ -1,21 +1,6 @@
 name: Attach release ZIP
 
 on:
-  release:
-    types: [published]
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: "Release tag to process (for example v1.0.9)"
-        required: false
-        type: string
-
-permissions:
-  contents: write
-
-  # Temporary test trigger: run once on this workflow-only commit.
-  # Removed immediately after the test download has been counted.
-on:
   push:
     branches:
       - main
@@ -30,6 +15,9 @@ on:
         required: false
         type: string
 
+permissions:
+  contents: write
+
 jobs:
   zip:
     name: Build and upload Refoss ZIP
@@ -41,7 +29,6 @@ jobs:
         env:
           INPUT_TAG: ${{ inputs.tag }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
-          EVENT_NAME: ${{ github.event_name }}
         run: |
           if [ -n "$INPUT_TAG" ]; then
             echo "tag=$INPUT_TAG" >> "$GITHUB_OUTPUT"

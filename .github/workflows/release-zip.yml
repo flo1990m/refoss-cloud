@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to process (for example v1.0.9)"
+        description: "Release tag to process (for example v1.0.10)"
         required: false
         type: string
 
@@ -30,7 +30,7 @@ jobs:
           elif [ -n "$RELEASE_TAG" ]; then
             echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
           else
-            echo "tag=v1.0.9" >> "$GITHUB_OUTPUT"
+            echo "tag=v1.0.10" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Checkout release source

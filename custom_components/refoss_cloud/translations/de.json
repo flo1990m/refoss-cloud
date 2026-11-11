@@ -1,0 +1,80 @@
+{
+  "title": "Refoss Cloud",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Mit Refoss verbinden",
+        "description": "Melde dich bei deinem Refoss-Cloud-Konto an.",
+        "data": {
+          "email": "E-Mail-Adresse",
+          "password": "Passwort"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Erneut authentifizieren",
+        "description": "Das Passwort für dein Refoss-Konto ({email}) wird nicht mehr akzeptiert. Gib es erneut ein, um die Integration wieder zu verbinden.",
+        "data": {
+          "password": "Passwort"
+        }
+      },
+      "reconfigure": {
+        "title": "Refoss-Zugangsdaten ändern",
+        "description": "Gib die E-Mail-Adresse und das Passwort des Refoss-Kontos ein. Verwende dasselbe Konto, damit die vorhandenen Geräte und Entitäten erhalten bleiben.",
+        "data": {
+          "email": "E-Mail-Adresse",
+          "password": "Neues Passwort"
+        }
+      },
+      "mfa": {
+        "title": "Zwei-Faktor-Authentifizierung",
+        "description": "Dein Refoss-Konto ({email}) ist durch die Zwei-Faktor-Authentifizierung geschützt. Gib den aktuellen Bestätigungscode aus deiner Authenticator-App ein.",
+        "data": {
+          "mfa_code": "Bestätigungscode"
+        },
+        "data_description": {
+          "mfa_code": "Gib den aktuell in deiner Authenticator-App angezeigten Code ein. Er ändert sich regelmäßig."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Verbindung zu Refoss nicht möglich.",
+      "invalid_auth": "Ungültige Refoss-Zugangsdaten.",
+      "unknown": "Unbekannter Fehler.",
+      "invalid_mfa": "Der Bestätigungscode ist falsch. Überprüfe den Code und versuche es erneut.",
+      "mfa_required": "Refoss benötigt weiterhin einen Bestätigungscode. Gib den aktuellen Code aus deiner Authenticator-App ein."
+    },
+    "abort": {
+      "already_configured": "Dieses Refoss-Konto ist bereits eingerichtet.",
+      "unique_id_mismatch": "Du musst dich mit demselben Refoss-Konto anmelden, das bereits eingerichtet ist."
+    }
+  },
+  "exceptions": {
+    "invalid_auth": {
+      "message": "Deine Refoss-Zugangsdaten sind nicht mehr gültig. Authentifiziere dein Konto erneut."
+    },
+    "cannot_connect": {
+      "message": "Der Refoss-Dienst ist nicht erreichbar. Home Assistant versucht es automatisch erneut."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "power": {
+        "name": "Leistung"
+      },
+      "voltage": {
+        "name": "Spannung"
+      },
+      "current": {
+        "name": "Stromstärke"
+      },
+      "energy_today": {
+        "name": "Energie heute"
+      }
+    },
+    "binary_sensor": {
+      "connection": {
+        "name": "Verbindung"
+      }
+    }
+  }
+}

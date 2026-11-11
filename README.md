@@ -6,9 +6,9 @@ Unofficial Home Assistant custom integration for Refoss smart plugs using the Re
 
 ## Features
 
-- Refoss account login through the Home Assistant UI
+- Refoss account login through the Home Assistant UI, including two-factor authentication (2FA/MFA)
 - Automatic refresh of rejected Refoss session tokens
-- Home Assistant reauthentication when the saved password is no longer accepted
+- Home Assistant reauthentication when the saved password is no longer accepted, including MFA when enabled
 - Manual credential reconfiguration from the Home Assistant integration menu, without removing the existing entry
 - Automatic discovery of devices on the account
 - Cloud ON/OFF control
@@ -55,7 +55,7 @@ into your Home Assistant `/config/custom_components/` directory, then restart Ho
 - A full Home Assistant restart is recommended after upgrading the integration. Reloading the config entry alone may not reload changed Python files.
 - Electricity sensors are only available on devices that answer the Refoss electricity namespace.
 - `power_display` is exposed as an attribute on compatible switch entities, for example for use in a Tile card with `state_content: power_display`.
-- The login flow is currently known to work with accounts tested in France. Feedback from other regions is useful.
+- The login flow, including authenticator-app MFA, has been tested with a Refoss account in France. Feedback from other regions is useful.
 
 ## Example Tile card with live power
 
@@ -76,13 +76,13 @@ grid_options:
 
 ## Privacy and security
 
-Credentials are stored in the Home Assistant config entry in the same way as many other cloud integrations. They are sent only to the Refoss cloud endpoints used by the integration.
+The account email and password, plus the session credentials returned by Refoss (account key and access token), are stored locally in the Home Assistant config entry. They are sent only to the Refoss cloud endpoints used by the integration. The one-time MFA code is used only during sign-in and is never stored. Keep Home Assistant backups private because they may contain these credentials and session values.
 
 The integration contains an application-level signing constant extracted from the official app. This is not a per-user secret.
 
 ## Updating account credentials manually
 
-Open the Refoss Cloud integration entry in Home Assistant, choose **Reconfigure**, then enter the account email and current password. The credentials are verified against Refoss before the existing config entry is updated. The same Refoss account must be used to preserve the devices and entity IDs.
+Open the Refoss Cloud integration entry in Home Assistant, choose **Reconfigure**, then enter the account email and current password. The credentials are verified against Refoss before the existing config entry is updated. If MFA is enabled, Home Assistant also asks for the current verification code. The same Refoss account must be used to preserve the devices and entity IDs.
 
 ## Authentication recovery
 

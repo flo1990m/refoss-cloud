@@ -19,42 +19,27 @@ from .const import DOMAIN
 from .entity import RefossEntity
 
 
+# Entity names are translated through translations/<language>.json.
 SENSORS = {
     "power": {
-        "name": "Puissance",
-        "device_class":
-            SensorDeviceClass.POWER,
-        "state_class":
-            SensorStateClass.MEASUREMENT,
-        "unit":
-            UnitOfPower.WATT,
+        "device_class": SensorDeviceClass.POWER,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "unit": UnitOfPower.WATT,
     },
     "voltage": {
-        "name": "Tension",
-        "device_class":
-            SensorDeviceClass.VOLTAGE,
-        "state_class":
-            SensorStateClass.MEASUREMENT,
-        "unit":
-            UnitOfElectricPotential.VOLT,
+        "device_class": SensorDeviceClass.VOLTAGE,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "unit": UnitOfElectricPotential.VOLT,
     },
     "current": {
-        "name": "Courant",
-        "device_class":
-            SensorDeviceClass.CURRENT,
-        "state_class":
-            SensorStateClass.MEASUREMENT,
-        "unit":
-            UnitOfElectricCurrent.AMPERE,
+        "device_class": SensorDeviceClass.CURRENT,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "unit": UnitOfElectricCurrent.AMPERE,
     },
     "energy_today": {
-        "name": "Énergie aujourd'hui",
-        "device_class":
-            SensorDeviceClass.ENERGY,
-        "state_class":
-            SensorStateClass.TOTAL,
-        "unit":
-            UnitOfEnergy.KILO_WATT_HOUR,
+        "device_class": SensorDeviceClass.ENERGY,
+        "state_class": SensorStateClass.TOTAL,
+        "unit": UnitOfEnergy.KILO_WATT_HOUR,
     },
 }
 
@@ -64,33 +49,20 @@ async def async_setup_entry(
     entry,
     async_add_entities,
 ):
-    coordinator = hass.data[
-        DOMAIN
-    ][
-        entry.entry_id
-    ]
-
+    coordinator = hass.data[DOMAIN][entry.entry_id]
     known = set()
 
-    def add_devices(
-        device_uuids,
-    ):
+    def add_devices(device_uuids):
         entities = []
 
         for device_uuid in device_uuids:
             for key in SENSORS:
-                unique = (
-                    device_uuid,
-                    key,
-                )
+                unique = (device_uuid, key)
 
                 if unique in known:
                     continue
 
-                known.add(
-                    unique
-                )
-
+                known.add(unique)
                 entities.append(
                     RefossSensor(
                         coordinator,
@@ -100,111 +72,46 @@ async def async_setup_entry(
                 )
 
         if entities:
-            async_add_entities(
-                entities
-            )
+            async_add_entities(entities)
 
-    add_devices(
-        coordinator.devices.keys()
+    add_devices(coordinator.devices.keys())
+
+    unsubscribe = async_dispatcher_connect(
+        hass,
+        f"{DOMAIN}_{entry.entry_id}_new_devices",
+        add_devices,
     )
-
-    unsubscribe = (
-        async_dispatcher_connect(
-            hass,
-            (
-                f"{DOMAIN}_"
-                f"{entry.entry_id}_"
-                f"new_devices"
-            ),
-            add_devices,
-        )
-    )
-
-    entry.async_on_unload(
-        unsubscribe
-    )
+    entry.async_on_unload(unsubscribe)
 
 
-class RefossSensor(
-    RefossEntity,
-    SensorEntity,
-):
+class RefossSensor(RefossEntity, SensorEntity):
     _attr_has_entity_name = True
 
-    def __init__(
-        self,
-        coordinator,
-        device_uuid,
-        sensor_key,
-    ):
-        super().__init__(
-            coordinator,
-            device_uuid,
-        )
+    def __init__(self, coordinator, device_uuid, sensor_key):
+        super().__init__(coordinator, device_uuid)
 
-        description = (
-            SENSORS[sensor_key]
-        )
+        description = SENSORS[sensor_key]
+        self.sensor_key = sensor_key
 
-        self.sensor_key = (
-            sensor_key
-        )
-
-        self._attr_unique_id = (
-            f"{device_uuid}_"
-            f"{sensor_key}"
-        )
-
-        self._attr_name = (
-            description["name"]
-        )
-
-        self._attr_device_class = (
-            description[
-                "device_class"
-            ]
-        )
-
-        self._attr_state_class = (
-            description[
-                "state_class"
-            ]
-        )
-
-        self._attr_native_unit_of_measurement = (
-            description["unit"]
-        )
+        self._attr_unique_id = f"{device_uuid}_{sensor_key}"
+        self._attr_translation_key = sensor_key
+        self._attr_device_class = description["device_class"]
+        self._attr_state_class = description["state_class"]
+        self._attr_native_unit_of_measurement = description["unit"]
 
     @property
     def native_value(self):
-        return self.refoss_state.get(
-            self.sensor_key
-        )
+        return self.refoss_state.get(self.sensor_key)
 
     @property
     def available(self):
         if not super().available:
             return False
 
-        if self.sensor_key in (
-            "power",
-            "voltage",
-            "current",
-        ):
-            return bool(
-                self.refoss_state.get(
-                    "supports_electricity"
-                )
-            )
+        if self.sensor_key in ("power", "voltage", "current"):
+            return bool(self.refoss_state.get("supports_electricity"))
 
-        if (
-            self.sensor_key
-            == "energy_today"
-        ):
-            return bool(
-                self.refoss_state.get(
-                    "supports_consumption"
-                )
-            )
+        if self.sensor_key == "energy_today":
+            return bool(self.refoss_state.get("supports_consumption"))
 
         return True

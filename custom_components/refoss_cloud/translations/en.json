@@ -11,7 +11,7 @@
         }
       },
       "reauth_confirm": {
-        "title": "[%key:common::config_flow::title::reauth%]",
+        "title": "Re-authenticate",
         "description": "The password for your Refoss account ({email}) is no longer accepted. Enter it again to reconnect the integration.",
         "data": {
           "password": "Password"
@@ -24,12 +24,24 @@
           "email": "Email address",
           "password": "New password"
         }
+      },
+      "mfa": {
+        "title": "Two-factor authentication",
+        "description": "Your Refoss account ({email}) requires a verification code. Enter the current code shown in your authenticator app.",
+        "data": {
+          "mfa_code": "Verification code"
+        },
+        "data_description": {
+          "mfa_code": "Enter the current code from your authenticator app. The code changes regularly."
+        }
       }
     },
     "error": {
       "cannot_connect": "Unable to connect to Refoss.",
       "invalid_auth": "Invalid Refoss credentials.",
-      "unknown": "Unknown error."
+      "unknown": "Unknown error.",
+      "invalid_mfa": "The verification code is incorrect. Check the code and try again.",
+      "mfa_required": "Refoss still requires a verification code. Enter the current code from your authenticator app."
     },
     "abort": {
       "already_configured": "This Refoss account is already configured.",
@@ -42,6 +54,27 @@
     },
     "cannot_connect": {
       "message": "Unable to reach Refoss. Home Assistant will retry automatically."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "power": {
+        "name": "Power"
+      },
+      "voltage": {
+        "name": "Voltage"
+      },
+      "current": {
+        "name": "Current"
+      },
+      "energy_today": {
+        "name": "Energy today"
+      }
+    },
+    "binary_sensor": {
+      "connection": {
+        "name": "Connection"
+      }
     }
   }
 }

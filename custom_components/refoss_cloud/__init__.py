@@ -15,6 +15,7 @@ async def async_setup_entry(hass, entry):
         hass,
         entry.data[CONF_EMAIL],
         entry.data[CONF_PASSWORD],
+        session_data=entry.data,
     )
 
     coordinator = RefossCoordinator(

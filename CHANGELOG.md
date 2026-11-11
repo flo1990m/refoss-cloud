@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.10
+
+- Add support for Refoss accounts protected by two-factor authentication (MFA), including initial setup, reauthentication and credential reconfiguration.
+- Detect Refoss MFA-required (1033) and invalid-code (1032) responses and prompt for the authenticator code in Home Assistant.
+- Persist the authenticated session returned after successful sign-in so Home Assistant can restart or reload without immediately repeating a password-only login. The one-time MFA code is never stored.
+- Add English, French and German translations for configuration flows, MFA prompts and entity names.
+- Remove the root strings.json file. Custom integrations load runtime translations from translations/<language>.json; the old file caused the raw mfa_code label to appear.
+
 ## 1.0.7
 
 - Add a manual "Reconfigure" action to update the Refoss account email and password from the Home Assistant integration menu.

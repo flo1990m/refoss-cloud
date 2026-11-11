@@ -18,6 +18,11 @@ from .const import (
     API_SECRET,
     APP_TYPE,
     APP_VERSION,
+    CONF_API_URL,
+    CONF_KEY,
+    CONF_MQTT_HOST,
+    CONF_TOKEN,
+    CONF_USER_ID,
     VENDOR,
 )
 
@@ -25,26 +30,27 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class RefossError(Exception):
-    pass
+    """Base Refoss integration error."""
 
 
 class RefossAuthError(RefossError):
-    pass
+    """Refoss rejected the credentials or authentication token."""
 
 
-class RefossConnectionError(
-    RefossError
-):
-    pass
+class RefossMfaRequired(RefossAuthError):
+    """Refoss requires a multi-factor authentication code."""
+
+
+class RefossMfaInvalid(RefossAuthError):
+    """Refoss rejected the supplied multi-factor authentication code."""
+
+
+class RefossConnectionError(RefossError):
+    """Refoss cloud could not be reached."""
 
 
 class RefossApi:
-    def __init__(
-        self,
-        hass,
-        email,
-        password,
-    ):
+    def __init__(self, hass, email, password, session_data=None):
         self.hass = hass
         self.email = email
         self.password = password
@@ -55,6 +61,15 @@ class RefossApi:
 
         self.api_url = API_BASE
         self.mqtt_host = None
+
+        # MFA codes are short-lived and must never be persisted. Instead, keep
+        # the session credentials returned by the successful MFA sign-in.
+        # The first async_login() during coordinator setup consumes this cached
+        # session instead of attempting a password-only login again.
+        self._restored_session = None
+        self._restored_session_pending = False
+        if session_data:
+            self._restore_session(session_data)
 
         self.client = None
         self.app_id = None
@@ -75,50 +90,23 @@ class RefossApi:
 
     @staticmethod
     def _md5(value):
-        return hashlib.md5(
-            value.encode("utf-8")
-        ).hexdigest()
+        return hashlib.md5(value.encode("utf-8")).hexdigest()
 
     @staticmethod
     def _nonce():
-        alphabet = (
-            string.ascii_uppercase
-            + string.digits
-        )
+        alphabet = string.ascii_uppercase + string.digits
+        return "".join(secrets.choice(alphabet) for _ in range(16))
 
-        return "".join(
-            secrets.choice(alphabet)
-            for _ in range(16)
-        )
-
-    def _envelope(
-        self,
-        params,
-    ):
+    def _envelope(self, params):
         raw = json.dumps(
             params,
             separators=(",", ":"),
             ensure_ascii=False,
         ).encode("utf-8")
-
-        encoded = (
-            base64.b64encode(raw)
-            .decode("ascii")
-        )
-
-        timestamp = int(
-            time.time() * 1000
-        )
-
+        encoded = base64.b64encode(raw).decode("ascii")
+        timestamp = int(time.time() * 1000)
         nonce = self._nonce()
-
-        sign = self._md5(
-            API_SECRET
-            + str(timestamp)
-            + nonce
-            + encoded
-        )
-
+        sign = self._md5(API_SECRET + str(timestamp) + nonce + encoded)
         return {
             "params": encoded,
             "sign": sign,
@@ -142,7 +130,6 @@ class RefossApi:
             for field in fields
             if data.get(field) is not None
         ).casefold()
-
         return any(
             marker in message
             for marker in (
@@ -167,9 +154,7 @@ class RefossApi:
         """Refresh the Refoss session once when the cloud rejects its token."""
         async with self._auth_lock:
             if self._auth_failed:
-                raise RefossAuthError(
-                    "Le compte Refoss doit être reconnecté"
-                )
+                raise RefossAuthError("Le compte Refoss doit être reconnecté")
 
             # Another concurrent request may already have refreshed the token.
             if self.token != failed_token:
@@ -181,27 +166,15 @@ class RefossApi:
                 self._auth_failed = True
                 raise
 
-    async def _post(
-        self,
-        base_url,
-        path,
-        params,
-        token=None,
-    ):
+    async def _post(self, base_url, path, params, token=None):
         """Post to Refoss and renew an expired session once if needed."""
         try:
-            return await self._post_once(
-                base_url,
-                path,
-                params,
-                token=token,
-            )
+            return await self._post_once(base_url, path, params, token=token)
         except RefossAuthError:
             if not token:
                 raise
 
             await self._async_refresh_token(token)
-
             try:
                 return await self._post_once(
                     self.api_url,
@@ -214,36 +187,20 @@ class RefossApi:
                 self._auth_failed = True
                 raise
 
-    async def _post_once(
-        self,
-        base_url,
-        path,
-        params,
-        token=None,
-    ):
+    async def _post_once(self, base_url, path, params, token=None):
         headers = {
-            "Content-Type":
-                "application/json",
-            "AppVersion":
-                APP_VERSION,
-            "AppType":
-                APP_TYPE,
-            "AppLanguage":
-                "FR",
-            "vender":
-                VENDOR,
-            "User-Agent":
-                f"Refoss/{APP_VERSION}",
+            "Content-Type": "application/json",
+            "AppVersion": APP_VERSION,
+            "AppType": APP_TYPE,
+            "AppLanguage": "FR",
+            "vender": VENDOR,
+            "User-Agent": f"Refoss/{APP_VERSION}",
         }
 
         if token:
-            headers[
-                "Authorization"
-            ] = "Basic " + token
+            headers["Authorization"] = "Basic " + token
 
-        payload = self._envelope(
-            params
-        )
+        payload = self._envelope(params)
 
         try:
             async with aiohttp.ClientSession() as session:
@@ -251,14 +208,9 @@ class RefossApi:
                     base_url + path,
                     headers=headers,
                     json=payload,
-                    timeout=aiohttp.ClientTimeout(
-                        total=20
-                    ),
+                    timeout=aiohttp.ClientTimeout(total=20),
                 ) as response:
-
-                    text = (
-                        await response.text()
-                    )
+                    response_text = await response.text()
 
                     if response.status in (401, 403) and (
                         token or path.endswith("/signIn")
@@ -269,101 +221,102 @@ class RefossApi:
                         )
 
                     if response.status != 200:
-                        raise RefossConnectionError(
-                            f"HTTP {response.status}"
-                        )
+                        raise RefossConnectionError(f"HTTP {response.status}")
 
         except asyncio.TimeoutError as exc:
-            raise RefossConnectionError(
-                "Timeout Refoss"
-            ) from exc
-
+            raise RefossConnectionError("Timeout Refoss") from exc
         except aiohttp.ClientError as exc:
-            raise RefossConnectionError(
-                str(exc)
-            ) from exc
+            raise RefossConnectionError(str(exc)) from exc
 
         try:
-            data = json.loads(text)
-
+            data = json.loads(response_text)
         except json.JSONDecodeError as exc:
-            raise RefossConnectionError(
-                "Réponse Refoss invalide"
-            ) from exc
+            raise RefossConnectionError("Réponse Refoss invalide") from exc
 
-        api_status = data.get(
-            "apiStatus"
-        )
+        api_status = data.get("apiStatus")
+        if api_status not in (None, 0, "0"):
+            info = data.get("info", "Erreur Refoss")
+            status = str(api_status)
 
-        if api_status not in (
-            None,
-            0,
-        ):
-            info = data.get(
-                "info",
-                "Erreur Refoss",
-            )
+            # Refoss uses the same MFA status codes as the Meross cloud API.
+            # 1033: a code is required; 1032: the supplied code is incorrect.
+            if path.endswith("/signIn"):
+                if status == "1033":
+                    raise RefossMfaRequired(str(info))
+                if status == "1032":
+                    raise RefossMfaInvalid(str(info))
+                raise RefossAuthError(str(info))
 
-            if path.endswith("/signIn") or (
-                token
-                and (
-                    api_status in (401, 403, "401", "403")
-                    or self._is_auth_error(data)
-                )
+            if token and (
+                status in ("401", "403", "1019", "1022", "1200")
+                or self._is_auth_error(data)
             ):
                 raise RefossAuthError(str(info))
 
             raise RefossError(str(info))
 
-        return data.get(
-            "data",
-            data,
-        )
+        return data.get("data", data)
 
-    async def async_login(self):
+    def _restore_session(self, session_data):
+        """Restore a previously authenticated Refoss session from config entry data."""
+        required = (
+            CONF_USER_ID,
+            CONF_KEY,
+            CONF_TOKEN,
+        )
+        if not all(session_data.get(key) for key in required):
+            return False
+
+        self.user_id = str(session_data[CONF_USER_ID])
+        self.key = str(session_data[CONF_KEY])
+        self.token = str(session_data[CONF_TOKEN])
+        self.api_url = session_data.get(CONF_API_URL) or API_BASE
+        self.mqtt_host = session_data.get(CONF_MQTT_HOST)
+        self._restored_session = {
+            "userid": self.user_id,
+            "key": self.key,
+            "token": self.token,
+            "domain": self.api_url,
+            "mqttDomain": self.mqtt_host,
+        }
+        self._restored_session_pending = True
+        return True
+
+    async def async_login(self, mfa_code=None):
+        """Authenticate to Refoss, optionally providing its MFA code."""
+        if self._restored_session_pending and not mfa_code:
+            # Coordinator initialization calls async_login() once by design.
+            # Reuse the MFA-authenticated token there; later calls (e.g. token
+            # refresh) perform a real sign-in and correctly trigger reauth/MFA.
+            self._restored_session_pending = False
+            self._auth_failed = False
+            return dict(self._restored_session)
+
+        params = {
+            "email": self.email,
+            "password": self._md5(self.password),
+            "accountCountryCode": "FR",
+            "encryption": 1,
+            "agree": 1,
+        }
+        if mfa_code:
+            params["mfaCode"] = str(mfa_code).strip()
+
         data = await self._post(
             API_BASE,
             "/v1/Auth/signIn",
-            {
-                "email": self.email,
-                "password": self._md5(
-                    self.password
-                ),
-                "accountCountryCode":
-                    "FR",
-                "encryption": 1,
-                "agree": 1,
-            },
+            params,
         )
 
-        self.user_id = str(
-            data["userid"]
-        )
-
-        self.key = str(
-            data["key"]
-        )
-
-        self.token = str(
-            data["token"]
-        )
-
-        self.api_url = (
-            data.get("domain")
-            or API_BASE
-        )
-
-        self.mqtt_host = data.get(
-            "mqttDomain"
-        )
-
+        self.user_id = str(data["userid"])
+        self.key = str(data["key"])
+        self.token = str(data["token"])
+        self.api_url = data.get("domain") or API_BASE
+        self.mqtt_host = data.get("mqttDomain")
         self._auth_failed = False
-
         return data
 
-    async def async_get_devices(
-        self,
-    ):
+    async def async_get_devices(self):
         data = await self._post(
             self.api_url,
             "/v1/Device/devList",
@@ -372,131 +325,47 @@ class RefossApi:
         )
 
         devices = []
-
-        if isinstance(
-            data,
-            list,
-        ):
+        if isinstance(data, list):
             devices = data
-
-        elif isinstance(
-            data,
-            dict,
-        ):
-            for key in (
-                "list",
-                "devices",
-                "deviceList",
-                "devList",
-            ):
-                value = data.get(
-                    key
-                )
-
-                if isinstance(
-                    value,
-                    list,
-                ):
+        elif isinstance(data, dict):
+            for key in ("list", "devices", "deviceList", "devList"):
+                value = data.get(key)
+                if isinstance(value, list):
                     devices = value
                     break
 
         result = {}
-
         for device in devices:
-            device_uuid = device.get(
-                "uuid"
-            )
-
+            device_uuid = device.get("uuid")
             if not device_uuid:
                 continue
-
-            result[
-                device_uuid
-            ] = device
+            result[device_uuid] = device
 
         self.devices = result
-
         return result
 
-    def set_push_callback(
-        self,
-        callback,
-    ):
-        self._push_callback = (
-            callback
-        )
+    def set_push_callback(self, callback):
+        self._push_callback = callback
 
-    async def async_connect_mqtt(
-        self,
-    ):
+    async def async_connect_mqtt(self):
         if self.connected:
             return
 
         loop = self.hass.loop
+        self.app_id = uuid.uuid4().hex
+        self.topic_user = f"/app/{self.user_id}/subscribe"
+        self.topic_reply = f"/app/{self.user_id}-{self.app_id}/subscribe"
+        mqtt_password = self._md5(self.user_id + self.key)
 
-        self.app_id = (
-            uuid.uuid4().hex
-        )
-
-        self.topic_user = (
-            f"/app/"
-            f"{self.user_id}"
-            f"/subscribe"
-        )
-
-        self.topic_reply = (
-            f"/app/"
-            f"{self.user_id}"
-            f"-{self.app_id}"
-            f"/subscribe"
-        )
-
-        mqtt_password = (
-            self._md5(
-                self.user_id
-                + self.key
-            )
-        )
-
-        def on_connect(
-            client,
-            userdata,
-            flags,
-            reason_code,
-            properties,
-        ):
-            if getattr(
-                reason_code,
-                "is_failure",
-                False,
-            ):
-                _LOGGER.error(
-                    "Connexion MQTT "
-                    "Refoss refusée : %s",
-                    reason_code,
-                )
+        def on_connect(client, userdata, flags, reason_code, properties):
+            if getattr(reason_code, "is_failure", False):
+                _LOGGER.error("Connexion MQTT Refoss refusée : %s", reason_code)
                 return
 
-            _LOGGER.debug(
-                "Connexion MQTT "
-                "Refoss réussie : %s",
-                reason_code,
-            )
-
-            client.subscribe(
-                self.topic_user,
-                qos=1,
-            )
-
-            client.subscribe(
-                self.topic_reply,
-                qos=1,
-            )
-
-            loop.call_soon_threadsafe(
-                self._set_connected,
-                True,
-            )
+            _LOGGER.debug("Connexion MQTT Refoss réussie : %s", reason_code)
+            client.subscribe(self.topic_user, qos=1)
+            client.subscribe(self.topic_reply, qos=1)
+            loop.call_soon_threadsafe(self._set_connected, True)
 
         def on_disconnect(
             client,
@@ -505,63 +374,31 @@ class RefossApi:
             reason_code,
             properties,
         ):
-            loop.call_soon_threadsafe(
-                self._set_connected,
-                False,
-            )
+            loop.call_soon_threadsafe(self._set_connected, False)
 
-        def on_message(
-            client,
-            userdata,
-            msg,
-        ):
+        def on_message(client, userdata, msg):
             try:
                 data = json.loads(
-                    msg.payload.decode(
-                        "utf-8",
-                        errors="replace",
-                    )
+                    msg.payload.decode("utf-8", errors="replace")
                 )
-
             except Exception:
                 return
-
-            loop.call_soon_threadsafe(
-                self._handle_message,
-                data,
-            )
+            loop.call_soon_threadsafe(self._handle_message, data)
 
         self.client = mqtt.Client(
-            callback_api_version=(
-                mqtt.CallbackAPIVersion.VERSION2
-            ),
-            client_id=(
-                "app:"
-                + self.app_id
-            ),
+            callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
+            client_id="app:" + self.app_id,
             protocol=mqtt.MQTTv311,
         )
-
         self.client.username_pw_set(
             username=self.user_id,
             password=mqtt_password,
         )
 
-        await self.hass.async_add_executor_job(
-            self.client.tls_set
-        )
-
-        self.client.on_connect = (
-            on_connect
-        )
-
-        self.client.on_disconnect = (
-            on_disconnect
-        )
-
-        self.client.on_message = (
-            on_message
-        )
+        await self.hass.async_add_executor_job(self.client.tls_set)
+        self.client.on_connect = on_connect
+        self.client.on_disconnect = on_disconnect
+        self.client.on_message = on_message
 
         await self.hass.async_add_executor_job(
             self.client.connect,
@@ -569,122 +406,54 @@ class RefossApi:
             443,
             60,
         )
-
         self.client.loop_start()
 
         for _ in range(50):
             if self.connected:
                 return
+            await asyncio.sleep(0.1)
 
-            await asyncio.sleep(
-                0.1
-            )
+        raise RefossConnectionError("Connexion MQTT Refoss impossible")
 
-        raise RefossConnectionError(
-            "Connexion MQTT "
-            "Refoss impossible"
-        )
-
-    def _set_connected(
-        self,
-        value,
-    ):
+    def _set_connected(self, value):
         self.connected = value
 
-    def _handle_message(
-        self,
-        message,
-    ):
-        header = message.get(
-            "header",
-            {}
-        )
-
-        message_id = header.get(
-            "messageId"
-        )
-
-        method = header.get(
-            "method"
-        )
+    def _handle_message(self, message):
+        header = message.get("header", {})
+        message_id = header.get("messageId")
+        method = header.get("method")
 
         if (
             message_id
-            and message_id
-            in self._pending
-            and method
-            in (
-                "GETACK",
-                "SETACK",
-                "ERROR",
-            )
+            and message_id in self._pending
+            and method in ("GETACK", "SETACK", "ERROR")
         ):
-            future = self._pending.pop(
-                message_id
-            )
-
+            future = self._pending.pop(message_id)
             if not future.done():
-                future.set_result(
-                    message
-                )
+                future.set_result(message)
 
-        if (
-            method == "PUSH"
-            and self._push_callback
-        ):
-            self._push_callback(
-                message
-            )
+        if method == "PUSH" and self._push_callback:
+            self._push_callback(message)
 
-    def _build_message(
-        self,
-        device_uuid,
-        namespace,
-        method,
-        payload,
-    ):
-        message_id = (
-            uuid.uuid4().hex
-        )
-
-        timestamp = int(
-            time.time()
-        )
-
-        sign = self._md5(
-            message_id
-            + self.key
-            + str(timestamp)
-        )
-
+    def _build_message(self, device_uuid, namespace, method, payload):
+        message_id = uuid.uuid4().hex
+        timestamp = int(time.time())
+        sign = self._md5(message_id + self.key + str(timestamp))
         message = {
             "header": {
-                "from":
-                    self.topic_reply,
-                "messageId":
-                    message_id,
-                "method":
-                    method,
-                "namespace":
-                    namespace,
-                "payloadVersion":
-                    1,
-                "sign":
-                    sign,
-                "timestamp":
-                    timestamp,
-                "triggerSrc":
-                    "Android",
-                "uuid":
-                    device_uuid,
+                "from": self.topic_reply,
+                "messageId": message_id,
+                "method": method,
+                "namespace": namespace,
+                "payloadVersion": 1,
+                "sign": sign,
+                "timestamp": timestamp,
+                "triggerSrc": "Android",
+                "uuid": device_uuid,
             },
             "payload": payload,
         }
-
-        return (
-            message_id,
-            message,
-        )
+        return message_id, message
 
     async def async_request(
         self,
@@ -700,91 +469,50 @@ class RefossApi:
         if not self.connected:
             await self.async_connect_mqtt()
 
-        (
-            message_id,
-            message,
-        ) = self._build_message(
+        message_id, message = self._build_message(
             device_uuid,
             namespace,
             method,
             payload,
         )
 
-        future = (
-            self.hass.loop
-            .create_future()
-        )
-
-        self._pending[
-            message_id
-        ] = future
-
-        topic = (
-            f"/appliance/"
-            f"{device_uuid}"
-            f"/subscribe"
-        )
-
+        future = self.hass.loop.create_future()
+        self._pending[message_id] = future
+        topic = f"/appliance/{device_uuid}/subscribe"
         info = self.client.publish(
             topic,
-            json.dumps(
-                message,
-                separators=(",", ":"),
-            ),
+            json.dumps(message, separators=(",", ":")),
             qos=1,
         )
-
-        await self.hass.async_add_executor_job(
-            info.wait_for_publish
-        )
+        await self.hass.async_add_executor_job(info.wait_for_publish)
 
         try:
-            return await asyncio.wait_for(
-                future,
-                timeout=timeout,
-            )
-
+            return await asyncio.wait_for(future, timeout=timeout)
         except asyncio.TimeoutError:
-            self._pending.pop(
-                message_id,
-                None,
-            )
+            self._pending.pop(message_id, None)
             return None
 
-    async def async_get_all(
-        self,
-        device_uuid,
-    ):
+    async def async_get_all(self, device_uuid):
         return await self.async_request(
             device_uuid,
             "Appliance.System.All",
         )
 
-    async def async_get_electricity(
-        self,
-        device_uuid,
-    ):
+    async def async_get_electricity(self, device_uuid):
         return await self.async_request(
             device_uuid,
             "Appliance.Control.Electricity",
             timeout=5,
         )
 
-    async def async_get_consumption(
-        self,
-        device_uuid,
-    ):
+    async def async_get_consumption(self, device_uuid):
         return await self.async_request(
             device_uuid,
             "Appliance.Control.ConsumptionX",
             timeout=5,
         )
 
-    async def async_set_switch(
-        self,
-        device_uuid,
-        onoff,
-    ):
+    async def async_set_switch(self, device_uuid, onoff):
         return await self.async_request(
             device_uuid,
             "Appliance.Control.ToggleX",
@@ -792,29 +520,20 @@ class RefossApi:
             payload={
                 "togglex": {
                     "channel": 0,
-                    "onoff": (
-                        1
-                        if onoff
-                        else 0
-                    ),
+                    "onoff": 1 if onoff else 0,
                 }
             },
         )
 
-    async def async_disconnect(
-        self,
-    ):
+    async def async_disconnect(self):
         if not self.client:
             return
 
         client = self.client
-
         try:
             # loop_stop() joins Paho's network thread, so never run it
             # directly on Home Assistant's event loop.
-            await self.hass.async_add_executor_job(
-                client.loop_stop
-            )
+            await self.hass.async_add_executor_job(client.loop_stop)
         except Exception:
             _LOGGER.debug(
                 "Erreur lors de l'arrêt de la boucle MQTT Refoss",
@@ -822,9 +541,7 @@ class RefossApi:
             )
 
         try:
-            await self.hass.async_add_executor_job(
-                client.disconnect
-            )
+            await self.hass.async_add_executor_job(client.disconnect)
         except Exception:
             _LOGGER.debug(
                 "Erreur lors de la déconnexion MQTT Refoss",

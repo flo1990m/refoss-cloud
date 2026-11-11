@@ -4,14 +4,14 @@
     "step": {
       "user": {
         "title": "Connexion à Refoss",
-        "description": "Connectez votre compte Refoss Cloud.",
+        "description": "Connecte-toi à ton compte Refoss Cloud.",
         "data": {
           "email": "Adresse e-mail",
           "password": "Mot de passe"
         }
       },
       "reauth_confirm": {
-        "title": "[%key:common::config_flow::title::reauth%]",
+        "title": "Réauthentification",
         "description": "Le mot de passe du compte Refoss ({email}) n’est plus accepté. Saisis-le à nouveau pour reconnecter l’intégration.",
         "data": {
           "password": "Mot de passe"
@@ -19,17 +19,29 @@
       },
       "reconfigure": {
         "title": "Modifier les identifiants Refoss",
-        "description": "Saisis l'adresse e-mail et le mot de passe du compte Refoss à utiliser. Le compte doit rester le même pour conserver les appareils et les entités existants.",
+        "description": "Saisis l’adresse e-mail et le mot de passe du compte Refoss à utiliser. Le compte doit rester le même pour conserver les appareils et les entités existants.",
         "data": {
           "email": "Adresse e-mail",
           "password": "Nouveau mot de passe"
+        }
+      },
+      "mfa": {
+        "title": "Double authentification",
+        "description": "Ton compte Refoss ({email}) est protégé par la double authentification. Saisis le code temporaire affiché dans ton application d’authentification.",
+        "data": {
+          "mfa_code": "Code de vérification"
+        },
+        "data_description": {
+          "mfa_code": "Saisis le code actuellement affiché dans ton application d’authentification. Il change régulièrement."
         }
       }
     },
     "error": {
       "cannot_connect": "Impossible de se connecter à Refoss.",
       "invalid_auth": "Identifiants Refoss incorrects.",
-      "unknown": "Erreur inconnue."
+      "unknown": "Erreur inconnue.",
+      "invalid_mfa": "Le code de vérification est incorrect. Vérifie le code et réessaie.",
+      "mfa_required": "Refoss demande toujours un code de vérification. Saisis le code actuel de ton application d’authentification."
     },
     "abort": {
       "already_configured": "Ce compte Refoss est déjà configuré.",
@@ -42,6 +54,27 @@
     },
     "cannot_connect": {
       "message": "Impossible de joindre le service Refoss. Home Assistant réessaiera automatiquement."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "power": {
+        "name": "Puissance"
+      },
+      "voltage": {
+        "name": "Tension"
+      },
+      "current": {
+        "name": "Courant"
+      },
+      "energy_today": {
+        "name": "Énergie aujourd’hui"
+      }
+    },
+    "binary_sensor": {
+      "connection": {
+        "name": "Connexion"
+      }
     }
   }
 }

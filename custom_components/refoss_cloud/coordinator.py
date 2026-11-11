@@ -5,6 +5,7 @@ from datetime import timedelta
 import logging
 import time
 
+from homeassistant.core import CoreState, EVENT_HOMEASSISTANT_STARTED
 from homeassistant.exceptions import (
     ConfigEntryAuthFailed,
     ConfigEntryNotReady,
@@ -36,7 +37,8 @@ class RefossCoordinator(DataUpdateCoordinator):
             hass,
             _LOGGER,
             name="Refoss Cloud",
-            update_interval=timedelta(seconds=SLOW_UPDATE_INTERVAL),
+            # Start periodic polling after the deferred first refresh.
+            update_interval=None,
             config_entry=entry,
         )
 
@@ -46,15 +48,17 @@ class RefossCoordinator(DataUpdateCoordinator):
         self.states = {}
         self._last_discovery = 0
         self._electricity_task = None
+        self._startup_task = None
+        self._unsubscribe_started = None
         self._stopping = False
 
         self.api.set_push_callback(self._handle_push)
 
     async def async_initialize(self):
+        """Authenticate and discover devices; defer MQTT and telemetry polling."""
         try:
             await self.api.async_login()
             self.devices = await self.api.async_get_devices()
-            await self.api.async_connect_mqtt()
         except RefossAuthError as exc:
             raise ConfigEntryAuthFailed(
                 translation_domain=DOMAIN,
@@ -66,20 +70,82 @@ class RefossCoordinator(DataUpdateCoordinator):
                 translation_key="cannot_connect",
             ) from exc
         except OSError as exc:
-            # MQTT socket errors (for example, DNS or network unavailable)
-            # must be retried by Home Assistant instead of aborting setup.
             raise ConfigEntryNotReady(
                 translation_domain=DOMAIN,
                 translation_key="cannot_connect",
             ) from exc
 
         self._last_discovery = time.monotonic()
-        await self.async_config_entry_first_refresh()
+        for device_uuid in self.devices:
+            self._ensure_state(device_uuid)
 
-        self._electricity_task = self.hass.async_create_background_task(
-            self._electricity_loop(),
-            "Refoss electricity polling",
+        # The initial snapshot makes the entities available immediately.
+        # The actual state and electricity data is filled after HA startup.
+        self.async_set_updated_data(self.states)
+
+    def async_start_deferred_initialization(self):
+        """Connect MQTT and fetch live device data after Home Assistant starts."""
+        if self.hass.state == CoreState.running:
+            self._start_deferred_initialization()
+            return
+
+        self._unsubscribe_started = self.hass.bus.async_listen_once(
+            EVENT_HOMEASSISTANT_STARTED,
+            self._handle_homeassistant_started,
         )
+
+    async def _handle_homeassistant_started(self, _event):
+        self._unsubscribe_started = None
+        self._start_deferred_initialization()
+
+    def _start_deferred_initialization(self):
+        if self._stopping:
+            return
+        if self._startup_task is not None and not self._startup_task.done():
+            return
+
+        self._startup_task = self.hass.async_create_background_task(
+            self._async_deferred_initialization(),
+            "Refoss initial cloud refresh",
+        )
+
+    async def _async_deferred_initialization(self):
+        """Run the first MQTT refresh outside the Home Assistant startup path."""
+        try:
+            try:
+                await self.api.async_connect_mqtt()
+            except RefossAuthError:
+                self.entry.async_start_reauth(self.hass)
+                return
+            except (RefossConnectionError, OSError) as exc:
+                # Individual requests also retry the MQTT connection. Keep the
+                # integration loaded and let the regular refresh retry if needed.
+                _LOGGER.warning(
+                    "Connexion MQTT Refoss différée impossible, nouvelle tentative pendant l'actualisation : %s",
+                    exc,
+                )
+
+            await self.async_refresh()
+
+            # Start the five-minute slow refresh timer only after the first
+            # deferred pass has completed (successfully or otherwise).
+            self.update_interval = timedelta(seconds=SLOW_UPDATE_INTERVAL)
+            self.async_set_updated_data(self.states)
+
+            if self._electricity_task is None and not self._stopping:
+                self._electricity_task = self.hass.async_create_background_task(
+                    self._electricity_loop(),
+                    "Refoss electricity polling",
+                )
+
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            _LOGGER.exception("Échec de l'initialisation différée Refoss")
+            # Even if the first deferred attempt fails, enable periodic retries.
+            self.update_interval = timedelta(seconds=SLOW_UPDATE_INTERVAL)
+            self.async_set_updated_data(self.states)
+
 
     async def _async_update_data(self):
         try:
@@ -421,12 +487,17 @@ class RefossCoordinator(DataUpdateCoordinator):
     async def async_shutdown(self):
         self._stopping = True
 
-        if self._electricity_task:
-            self._electricity_task.cancel()
+        if self._unsubscribe_started:
+            self._unsubscribe_started()
+            self._unsubscribe_started = None
 
-            try:
-                await self._electricity_task
-            except asyncio.CancelledError:
-                pass
+        for task in (self._startup_task, self._electricity_task):
+            if task and not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
 
-            self._electricity_task = None
+        self._startup_task = None
+        self._electricity_task = None

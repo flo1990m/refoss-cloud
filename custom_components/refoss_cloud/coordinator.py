@@ -146,7 +146,6 @@ class RefossCoordinator(DataUpdateCoordinator):
             self.update_interval = timedelta(seconds=SLOW_UPDATE_INTERVAL)
             self.async_set_updated_data(self.states)
 
-
     async def _async_update_data(self):
         try:
             now = time.monotonic()

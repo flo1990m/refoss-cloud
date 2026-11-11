@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.11
+
+- Improve the German translation of the daily energy sensor label.
+
 ## 1.0.10
 
 - Add support for Refoss accounts protected by two-factor authentication (MFA), including initial setup, reauthentication and credential reconfiguration.

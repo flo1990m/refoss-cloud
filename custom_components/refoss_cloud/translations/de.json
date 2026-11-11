@@ -68,7 +68,7 @@
         "name": "Stromstärke"
       },
       "energy_today": {
-        "name": "Energie heute"
+        "name": "Energieverbrauch heute"
       }
     },
     "binary_sensor": {

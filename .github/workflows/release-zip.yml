@@ -7,8 +7,15 @@ on:
     inputs:
       tag:
         description: "Release tag to process (for example v1.0.9)"
-        required: true
+        required: false
         type: string
+  # One-time bootstrap: publishing this workflow update builds the ZIP for
+  # the already-published v1.0.9 release. Future code pushes do not trigger it.
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/release-zip.yml"
 
 permissions:
   contents: write
@@ -18,10 +25,26 @@ jobs:
     name: Build and upload Refoss ZIP
     runs-on: ubuntu-latest
     steps:
+      - name: Select release tag
+        id: target
+        shell: bash
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ -n "$INPUT_TAG" ]; then
+            echo "tag=$INPUT_TAG" >> "$GITHUB_OUTPUT"
+          elif [ -n "$RELEASE_TAG" ]; then
+            echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=v1.0.9" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout release source
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.tag || github.event.release.tag_name || github.ref_name }}
+          ref: ${{ steps.target.outputs.tag }}
 
       - name: Create refoss-cloud.zip
         shell: bash
@@ -35,5 +58,5 @@ jobs:
       - name: Upload ZIP to GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ inputs.tag || github.event.release.tag_name || github.ref_name }}
+          TAG: ${{ steps.target.outputs.tag }}
         run: gh release upload "$TAG" refoss-cloud.zip --clobber

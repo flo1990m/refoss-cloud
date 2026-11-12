@@ -1,6 +1,15 @@
 # Refoss Cloud for Home Assistant
 
-Unofficial Home Assistant custom integration for Refoss smart plugs using the Refoss cloud API and MQTT push channel.
+Unofficial Home Assistant custom integration for Refoss smart plugs using the Refoss cloud API and MQTT push channel. **Control is cloud-based, not LAN-based:** Home Assistant does not need to be on the same local network as your plugs.
+
+## Cloud-based control — not limited to your local network
+
+Unlike integrations that communicate directly with devices over the local network, Refoss Cloud connects to the Refoss cloud service. This lets one Home Assistant instance manage compatible plugs wherever they are located, even when they are connected to different routers, networks or Internet connections.
+
+For example, you can control plugs at your main home, a second home, or another remote site from the same Home Assistant installation. The plugs do **not** need to share the same Wi-Fi/LAN as Home Assistant, and you do not need to connect those locations with a VPN or port forwarding.
+
+**Requirement:** each plug must be online and linked to the same Refoss account configured in the integration so that it can communicate with the Refoss cloud. A device that is offline or disconnected from the cloud cannot be controlled.
+
 
 > This project is not affiliated with, endorsed by, or supported by Refoss. It relies on undocumented cloud endpoints observed from the official Refoss application, so Refoss may change them at any time.
 
